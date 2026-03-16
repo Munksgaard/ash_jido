@@ -11,6 +11,7 @@ defmodule AshJido.TypeMapperTest do
   @moduletag :capture_log
 
   alias AshJido.TypeMapper
+  alias AshJido.Test.SampleExtractionResult
 
   describe "ash_type_to_nimble_options/2" do
     test "maps primitive scalar types correctly" do
@@ -164,6 +165,117 @@ defmodule AshJido.TypeMapperTest do
       assert Keyword.get(result, :required) == true
       assert Keyword.get(result, :doc) == "Complex field"
       assert Keyword.get(result, :default) == "default_value"
+    end
+  end
+
+  describe "typed_struct_to_schema/1" do
+    test "converts TypedStruct module to NimbleOptions schema" do
+      schema = TypeMapper.typed_struct_to_schema(SampleExtractionResult)
+
+      assert is_list(schema)
+      assert Keyword.keyword?(schema)
+
+      # Check that all expected fields are present
+      assert Keyword.has_key?(schema, :name)
+      assert Keyword.has_key?(schema, :age)
+      assert Keyword.has_key?(schema, :active)
+      assert Keyword.has_key?(schema, :score)
+      assert Keyword.has_key?(schema, :category)
+      assert Keyword.has_key?(schema, :tags)
+      assert Keyword.has_key?(schema, :start_date)
+    end
+
+    test "preserves field types correctly" do
+      schema = TypeMapper.typed_struct_to_schema(SampleExtractionResult)
+
+      assert schema[:name][:type] == :string
+      assert schema[:age][:type] == :integer
+      assert schema[:active][:type] == :boolean
+      assert schema[:score][:type] == :float
+      assert schema[:start_date][:type] == :string
+    end
+
+    test "preserves array types" do
+      schema = TypeMapper.typed_struct_to_schema(SampleExtractionResult)
+
+      assert schema[:tags][:type] == {:list, :string}
+    end
+
+    test "sets required: true for fields with allow_nil?: false" do
+      schema = TypeMapper.typed_struct_to_schema(SampleExtractionResult)
+
+      assert schema[:name][:required] == true
+      assert schema[:category][:required] == true
+    end
+
+    test "omits required key for optional fields" do
+      schema = TypeMapper.typed_struct_to_schema(SampleExtractionResult)
+
+      refute Keyword.has_key?(schema[:age], :required)
+      refute Keyword.has_key?(schema[:active], :required)
+      refute Keyword.has_key?(schema[:score], :required)
+      refute Keyword.has_key?(schema[:tags], :required)
+    end
+
+    test "preserves field descriptions as doc" do
+      schema = TypeMapper.typed_struct_to_schema(SampleExtractionResult)
+
+      assert schema[:name][:doc] == "The name"
+      assert schema[:age][:doc] == "The age"
+      assert schema[:score][:doc] == "Score value"
+      assert schema[:category][:doc] == "The category"
+      assert schema[:tags][:doc] == "List of tags"
+      assert schema[:start_date][:doc] == "Start date"
+    end
+
+    test "converts atom one_of constraints to {:in, values}" do
+      schema = TypeMapper.typed_struct_to_schema(SampleExtractionResult)
+
+      # Atom field with one_of constraint should be converted to {:in, string_values}
+      assert schema[:category][:type] == {:in, ["a", "b", "c"]}
+    end
+
+    test "handles fields without descriptions" do
+      schema = TypeMapper.typed_struct_to_schema(SampleExtractionResult)
+
+      # active field has no description
+      refute Keyword.has_key?(schema[:active], :doc)
+    end
+  end
+
+  describe "typed_struct_to_schema/2" do
+    test "returns unwrapped schema for :single mode" do
+      single_schema = TypeMapper.typed_struct_to_schema(SampleExtractionResult, :single)
+      direct_schema = TypeMapper.typed_struct_to_schema(SampleExtractionResult)
+
+      assert single_schema == direct_schema
+    end
+
+    test "returns JSON Schema map for :array mode" do
+      array_schema = TypeMapper.typed_struct_to_schema(SampleExtractionResult, :array)
+
+      assert is_map(array_schema)
+      assert array_schema["type"] == "array"
+      assert is_map(array_schema["items"])
+      assert array_schema["items"]["type"] == "object"
+      assert is_map(array_schema["items"]["properties"])
+      assert array_schema["items"]["properties"]["name"]["type"] == "string"
+      assert "name" in array_schema["items"]["required"]
+    end
+
+    test "array mode JSON Schema preserves enum constraints" do
+      array_schema = TypeMapper.typed_struct_to_schema(SampleExtractionResult, :array)
+      category_prop = array_schema["items"]["properties"]["category"]
+
+      assert category_prop["type"] == "string"
+      assert category_prop["enum"] == ["a", "b", "c"]
+    end
+
+    test "array mode JSON Schema preserves descriptions" do
+      array_schema = TypeMapper.typed_struct_to_schema(SampleExtractionResult, :array)
+      name_prop = array_schema["items"]["properties"]["name"]
+
+      assert name_prop["description"] == "The name"
     end
   end
 end
