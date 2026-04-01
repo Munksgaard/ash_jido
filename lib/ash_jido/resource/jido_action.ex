@@ -16,7 +16,7 @@ defmodule AshJido.Resource.JidoAction do
     :signal_type,
     :signal_source,
     :__spark_metadata__,
-    action_parameters: [:filter, :sort, :limit, :offset],
+    query_params: [:filter, :sort, :limit, :offset],
     emit_signals?: false,
     telemetry?: false,
     output_map?: true
@@ -31,7 +31,7 @@ defmodule AshJido.Resource.JidoAction do
           tags: [String.t()] | nil,
           vsn: String.t() | nil,
           load: term() | nil,
-          action_parameters: [:filter | :sort | :limit | :offset],
+          query_params: [:filter | :sort | :limit | :offset],
           signal_dispatch: term() | nil,
           signal_type: String.t() | nil,
           signal_source: String.t() | nil,

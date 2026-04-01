@@ -66,7 +66,7 @@ defmodule AshJido.QueryParametersTest do
     end
 
     jido do
-      action(:read, action_parameters: [:limit])
+      action(:read, query_params: [:limit])
     end
   end
 
@@ -151,7 +151,7 @@ defmodule AshJido.QueryParametersTest do
       assert schema[:offset][:type] == :non_neg_integer
     end
 
-    test "action_parameters: [:limit] only includes limit in schema" do
+    test "query_params: [:limit] only includes limit in schema" do
       schema = RestrictedItem.Jido.Read.schema()
 
       assert Keyword.has_key?(schema, :limit)

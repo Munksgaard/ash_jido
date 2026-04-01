@@ -193,6 +193,7 @@ Each action in the `jido` section supports these options:
 | `vsn` | `string` | `nil` | Optional semantic version metadata |
 | `output_map?` | `boolean` | `true` | Convert output structs to maps |
 | `load` | `term` | `nil` | Static `Ash.Query.load/2` statement for read actions |
+| `query_params` | `list(atom)` | `[:filter, :sort, :limit, :offset]` | Query parameters to expose for read actions |
 | `emit_signals?` | `boolean` | `false` | Emit Jido signals from Ash notifications (create/update/destroy) |
 | `signal_dispatch` | `term` | `nil` | Default signal dispatch config (overridable via context) |
 | `signal_type` | `string` | derived | Override emitted signal type |
@@ -202,6 +203,7 @@ Each action in the `jido` section supports these options:
 `all_actions` additionally supports:
 
 - `read_load` for static read relationship loading
+- `read_query_params` to configure which query parameters to expose for read actions
 - `category` (default `ash.<action_type>`)
 - `tags`
 - `vsn`
@@ -480,6 +482,126 @@ alias MyApp.Blog.Post
   %{domain: MyApp.Blog}
 )
 ```
+
+## Querying and Filtering
+
+Generated Jido read actions support query parameters for filtering, sorting, and pagination. These parameters are optional and provide powerful querying capabilities while respecting Ash's authorization policies.
+
+### Filter Syntax
+
+Use the `filter` parameter to query records using Ash's filter input syntax:
+
+```elixir
+# Simple equality filter
+{:ok, users} = MyApp.Accounts.User.Jido.Read.run(
+  %{filter: %{name: "John Doe"}},
+  %{domain: MyApp.Accounts}
+)
+
+# Filter with operators
+{:ok, adults} = MyApp.Accounts.User.Jido.Read.run(
+  %{filter: %{age: %{greater_than: 18}}},
+  %{domain: MyApp.Accounts}
+)
+
+# Multiple conditions (all must match)
+{:ok, active_admins} = MyApp.Accounts.User.Jido.Read.run(
+  %{filter: %{status: "active", role: "admin"}},
+  %{domain: MyApp.Accounts}
+)
+
+# IN operator for multiple values
+{:ok, users} = MyApp.Accounts.User.Jido.Read.run(
+  %{filter: %{status: %{in: ["active", "pending"]}}},
+  %{domain: MyApp.Accounts}
+)
+```
+
+**Common Filter Operators:**
+
+- `%{field: value}` — Equality
+- `%{field: %{greater_than: value}}` — Greater than
+- `%{field: %{less_than: value}}` — Less than
+- `%{field: %{greater_than_or_equal: value}}` — Greater than or equal
+- `%{field: %{less_than_or_equal: value}}` — Less than or equal
+- `%{field: %{in: [value1, value2]}}` — Match any value in list
+- `%{field: %{contains: "substring"}}` — String contains (case-sensitive)
+
+### Sorting
+
+Use the `sort` parameter to order results. Provide a list of maps with `field` and `direction`:
+
+```elixir
+# Sort by single field
+{:ok, users} = MyApp.Blog.Post.Jido.Read.run(
+  %{sort: [%{field: :created_at, direction: :desc}]},
+  %{domain: MyApp.Blog}
+)
+
+# Sort by multiple fields
+{:ok, users} = MyApp.Blog.Post.Jido.Read.run(
+  %{sort: [%{field: :category, direction: :asc}, %{field: :title, direction: :asc}]},
+  %{domain: MyApp.Blog}
+)
+```
+
+**Supported sort directions:** `:asc`, `:desc`, `:asc_nils_first`, `:asc_nils_last`, `:desc_nils_first`, `:desc_nils_last`
+
+### Pagination
+
+Use `limit` and `offset` for pagination:
+
+```elixir
+# First page (20 items)
+{:ok, page1} = MyApp.Accounts.User.Jido.Read.run(
+  %{limit: 20, offset: 0},
+  %{domain: MyApp.Accounts}
+)
+
+# Second page
+{:ok, page2} = MyApp.Accounts.User.Jido.Read.run(
+  %{limit: 20, offset: 20},
+  %{domain: MyApp.Accounts}
+)
+
+# Combine with filtering and sorting
+{:ok, active_users_page} = MyApp.Accounts.User.Jido.Read.run(
+  %{
+    filter: %{status: "active"},
+    sort: [%{field: :name, direction: :asc}],
+    limit: 50,
+    offset: 100
+  },
+  %{domain: MyApp.Accounts}
+)
+```
+
+### Configuration
+
+Query parameters are enabled by default for read actions. You can configure which parameters are exposed:
+
+```elixir
+jido do
+  # All query params enabled by default
+  action :read
+
+  # Disable all query params for a specific action
+  action :read, query_params: []
+
+  # Only expose limit and offset
+  action :read, query_params: [:limit, :offset]
+
+  # Configure defaults for all read actions
+  all_actions read_query_params: [:filter, :sort, :limit, :offset]
+end
+```
+
+**Security Note:** Query parameters use Ash's safe `filter_input` and `sort_input` variants, which:
+
+- Only allow filtering and sorting on public attributes
+- Honor field policies and authorization rules
+- Prevent access to private or sensitive fields
+- Validate all input before executing queries
 
 ## Next Steps
 

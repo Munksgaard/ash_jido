@@ -80,7 +80,7 @@ defmodule AshJido.Generator do
     # Ash query, then applied as separate Ash.Query calls.
     query_param_keys =
       if ash_action.type == :read do
-        jido_action.action_parameters
+        jido_action.query_params
       else
         []
       end
@@ -432,10 +432,10 @@ defmodule AshJido.Generator do
             "AshJido: :load option is only supported for read actions. #{inspect(resource)}.#{ash_action.name} is a #{ash_action.type} action."
     end
 
-    if jido_action.action_parameters not in [[], [:filter, :sort, :limit, :offset]] and
+    if jido_action.query_params not in [[], [:filter, :sort, :limit, :offset]] and
          ash_action.type != :read do
       raise ArgumentError,
-            "AshJido: :action_parameters option is only supported for read actions. #{inspect(resource)}.#{ash_action.name} is a #{ash_action.type} action."
+            "AshJido: :query_params option is only supported for read actions. #{inspect(resource)}.#{ash_action.name} is a #{ash_action.type} action."
     end
   end
 
@@ -509,12 +509,12 @@ defmodule AshJido.Generator do
   end
 
   # Builds NimbleOptions schema entries for query parameters (filter, sort,
-  # limit, offset). Only includes params enabled via action_parameters config.
+  # limit, offset). Only includes params enabled via query_params config.
   # Schema doc strings list public filterable/sortable field names (attributes,
   # calculations, aggregates) to guide LLM tool usage. Field validation logic
   # follows ash_json_api's pattern for type safety.
   defp build_query_param_schema(resource, jido_action, dsl_state) do
-    enabled_params = jido_action.action_parameters
+    enabled_params = jido_action.query_params
 
     # Use Transformer.get_entities for compile-time introspection (resource
     # module isn't fully compiled yet when this runs). Collect attributes,

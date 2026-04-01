@@ -14,7 +14,7 @@ Bridge Ash Framework resources with Jido agents. Generates `Jido.Action` modules
 ## What It Does Not Do
 
 - Auto-discover domains or resources (domain is explicit and required)
-- Add pagination or query-layer magic
+
 - Bypass Ash authorization, policies, or data layers
 
 ## Installation
@@ -64,6 +64,42 @@ Generated modules:
 )
 ```
 
+
+## Query Parameters
+
+Generated Jido read actions include optional query parameters for filtering, sorting, and pagination:
+
+```elixir
+{:ok, users} = MyApp.User.Jido.Read.run(
+  %{
+    filter: %{status: %{in: ["active", "pending"]}},
+    sort: [%{field: :name, direction: :asc}, %{field: :created_at, direction: :desc}],
+    limit: 20,
+    offset: 40
+  },
+  %{domain: MyApp.Accounts}
+)
+```
+
+**Available Parameters:**
+
+- `filter` (map) — Filter using Ash's filter input syntax: `%{name: "fred"}`, `%{age: %{greater_than: 25}}`
+- `sort` (list of maps) — Sort via `[%{field: :name, direction: :asc}]`. Supports all Ash sort directions: `:asc`, `:desc`, `:asc_nils_first`, `:asc_nils_last`, `:desc_nils_first`, `:desc_nils_last`
+- `limit` (non_neg_integer) — Maximum results to return
+- `offset` (non_neg_integer) — Results to skip (for pagination)
+
+**Security:** Query parameters use Ash's safe `filter_input`/`sort_input` variants, which only allow filtering and sorting on public attributes and honor field policies.
+
+**Configuration:**
+
+```elixir
+jido do
+  action :read                            # all query params enabled by default
+  action :read, query_params: []          # disable all query params
+  action :read, query_params: [:limit]    # only expose limit
+  all_actions read_query_params: [:filter, :sort, :limit, :offset]  # default for all reads
+end
+```
 ## Context Requirements
 
 The `domain` is **required** in context. An `ArgumentError` is raised if missing.
@@ -149,6 +185,7 @@ Published signals include Ash metadata in `signal.extensions["jido_metadata"]`.
 | `vsn` | string | `nil` | Optional semantic version metadata |
 | `output_map?` | boolean | `true` | Convert structs to maps |
 | `load` | term | `nil` | Static `Ash.Query.load/2` for read actions |
+| `query_params` | list(atom) | `[:filter, :sort, :limit, :offset]` | Query parameters to expose for read actions |
 | `emit_signals?` | boolean | `false` | Emit Jido signals from Ash notifications (create/update/destroy) |
 | `signal_dispatch` | term | `nil` | Default signal dispatch config (can be overridden via context) |
 | `signal_type` | string | derived | Override emitted signal type |
@@ -165,6 +202,7 @@ Published signals include Ash metadata in `signal.extensions["jido_metadata"]`.
 | `tags` | list(string) | `[]` | Tags added to all generated actions |
 | `vsn` | string | `nil` | Optional semantic version metadata for generated actions |
 | `read_load` | term | `nil` | Static `Ash.Query.load/2` for generated read actions |
+| `read_query_params` | list(atom) | `[:filter, :sort, :limit, :offset]` | Query parameters for generated read actions |
 | `emit_signals?` | boolean | `false` | Emit Jido signals from generated create/update/destroy actions |
 | `signal_dispatch` | term | `nil` | Default signal dispatch config for generated actions |
 | `signal_type` | string | derived | Override emitted signal type |
